@@ -8,15 +8,15 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@tailwindcss/postcss": "^4.1.17",
+    "@types/node": "^20.19.25",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "class-variance-authority": "^0.7.1",
     "lucide-react": "^0.553.0",
-    "tailwind-merge": "^3.3.1",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.9.3"
   },
   "name": "drawio-to-tikz",
   "private": true,
