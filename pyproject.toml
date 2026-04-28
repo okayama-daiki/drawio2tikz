@@ -1,0 +1,63 @@
+[build-system]
+requires = ["uv_build>=0.8.14,<0.9.0"]
+build-backend = "uv_build"
+
+[project]
+name = "drawio2tikz"
+version = "0.1.0"
+description = "Convert diagrams.net/draw.io diagrams to TikZ via SVG."
+readme = "README.md"
+authors = [{ name = "Daiki Okayama", email = "lawliet.d.k.m@gmail.com" }]
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["drawio", "diagrams.net", "svg", "tikz", "latex"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: OS Independent",
+  "Topic :: Multimedia :: Graphics :: Editors :: Vector-Based",
+  "Topic :: Text Processing :: Markup :: LaTeX",
+]
+dependencies = [
+  "rich>=13.7",
+  "svg2tikz>=3.3.4",
+  "typer>=0.15",
+]
+
+[project.urls]
+Homepage = "https://github.com/daikiokayama/drawio2tikz"
+Issues = "https://github.com/daikiokayama/drawio2tikz/issues"
+
+[project.scripts]
+drawio2tikz = "drawio2tikz.cli:app"
+
+[dependency-groups]
+dev = [
+  "basedpyright>=1.34.0",
+  "pytest>=8.0",
+  "ruff>=0.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "E501",  # Line too long
+  "D203",  # Insert 1 blank line before class docstring
+  "D213",  # Multi-line docstring summary should start at the next line
+]
+
+[tool.basedpyright]
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
