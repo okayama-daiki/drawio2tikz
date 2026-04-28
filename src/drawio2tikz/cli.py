@@ -1,12 +1,16 @@
+"""Command-line interface for drawio2tikz."""
+
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 from rich.console import Console
 
 from .converter import ConvertOptions, convert
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 app = typer.Typer(
     add_completion=False,
@@ -29,6 +33,7 @@ def main(
         int,
         typer.Option("--page-index", min=1, help="1-based draw.io page index."),
     ] = 1,
+    *,
     all_pages: Annotated[
         bool,
         typer.Option("--all-pages", help="Export every page found in a .drawio file."),
@@ -70,8 +75,10 @@ def main(
         typer.Option("--quiet", "-q", help="Suppress external command echoing."),
     ] = False,
 ) -> None:
+    """Convert draw.io diagrams to TikZ LaTeX code."""
     if svg_dir and not keep_svg:
-        raise typer.BadParameter("--svg-dir requires --keep-svg")
+        msg = "--svg-dir requires --keep-svg"
+        raise typer.BadParameter(msg)
 
     options = ConvertOptions(
         input_path=input_path,
@@ -102,7 +109,7 @@ def main(
             console.print(
                 "[yellow]warning:[/yellow] sanitized SVG still contains "
                 f"{result.remaining_foreign_objects} foreignObject node(s); "
-                "some draw.io HTML text may be omitted."
+                "some draw.io HTML text may be omitted.",
             )
         if result.text_nodes:
             console.print(f"note: sanitized SVG contains {result.text_nodes} SVG text node(s).")

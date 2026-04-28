@@ -1,3 +1,5 @@
+"""SVG to TikZ conversion with sanitization for draw.io diagrams."""
+
 from __future__ import annotations
 
 import re
@@ -5,15 +7,20 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from svg2tikz import convert_svg
 
 from .drawio import count_pages, drawio_stem, parse_labels
 from .svg import sanitize_svg
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from .drawio import Label
 
 XML_DECL_RE = re.compile(r"^\s*<\?xml[^>]*\?>\s*", re.IGNORECASE)
 DOCTYPE_RE = re.compile(r"^\s*<!DOCTYPE[^>]*(?:\[[\s\S]*?\]\s*)?>\s*", re.IGNORECASE)
@@ -21,6 +28,8 @@ DOCTYPE_RE = re.compile(r"^\s*<!DOCTYPE[^>]*(?:\[[\s\S]*?\]\s*)?>\s*", re.IGNORE
 
 @dataclass(frozen=True)
 class ConvertOptions:
+    """Options for SVG to TikZ conversion."""
+
     input_path: Path
     output: Path | None = None
     page_index: int = 1
@@ -38,6 +47,8 @@ class ConvertOptions:
 
 @dataclass(frozen=True)
 class ConversionResult:
+    """Result of a single conversion."""
+
     tex_path: Path
     svg_path: Path | None
     remaining_foreign_objects: int
@@ -45,10 +56,12 @@ class ConversionResult:
 
 
 def convert(options: ConvertOptions) -> list[ConversionResult]:
+    """Convert a draw.io file to TikZ LaTeX code."""
     if not options.input_path.exists():
         raise FileNotFoundError(options.input_path)
     if shutil.which(options.drawio_bin) is None and not Path(options.drawio_bin).exists():
-        raise RuntimeError(f"draw.io CLI not found: {options.drawio_bin}")
+        msg = f"draw.io CLI not found: {options.drawio_bin}"
+        raise RuntimeError(msg)
 
     labels = parse_labels(options.input_path)
     page_indexes = _page_indexes(options)
@@ -57,25 +70,28 @@ def convert(options: ConvertOptions) -> list[ConversionResult]:
 
 
 def _page_indexes(options: ConvertOptions) -> list[int]:
+    """Get list of page indexes to convert."""
     if not options.all_pages:
         return [options.page_index]
 
     page_count = count_pages(options.input_path)
     if page_count == 0:
-        raise RuntimeError("--all-pages needs a plain .drawio XML file with diagram pages.")
+        msg = "--all-pages needs a plain .drawio XML file with diagram pages."
+        raise RuntimeError(msg)
     return list(range(1, page_count + 1))
 
 
 def _convert_one(
     options: ConvertOptions,
-    labels: dict[str, object],
+    labels: dict[str, Label],
     page_index: int,
 ) -> ConversionResult:
+    """Convert a single page to TikZ."""
     tex_path = _default_output_path(
         options.input_path,
         options.output,
         page_index,
-        options.all_pages,
+        all_pages=options.all_pages,
     )
     tex_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -112,6 +128,7 @@ def _convert_one(
 
 
 def _run_drawio_export(options: ConvertOptions, page_index: int, raw_svg: Path) -> None:
+    """Run draw.io CLI to export SVG."""
     command = [
         options.drawio_bin,
         "--export",
@@ -124,15 +141,17 @@ def _run_drawio_export(options: ConvertOptions, page_index: int, raw_svg: Path) 
         str(options.input_path),
     ]
     if not options.quiet:
-        print("+ " + " ".join(command), flush=True)
-    subprocess.run(command, check=True)
+        sys.stdout.write(f"+ {' '.join(command)}\n")
+        sys.stdout.flush()
+    subprocess.run(command, check=True)  # noqa: S603
 
 
 def _convert_svg_source(svg_source: str, options: ConvertOptions) -> str:
+    """Convert SVG source to TikZ code."""
     # svg2tikz exposes a library API, but internally it still calls
     # argparse.parse_args(). Isolate it from drawio2tikz's CLI arguments.
     with _isolated_argv():
-        return convert_svg(
+        result: str = convert_svg(
             _strip_xml_prolog(svg_source),
             no_output=True,
             returnstring=True,
@@ -144,15 +163,18 @@ def _convert_svg_source(svg_source: str, options: ConvertOptions) -> str:
             scale=options.scale,
             round_number=options.round_number,
         )
+        return result
 
 
 def _strip_xml_prolog(svg_source: str) -> str:
+    """Strip XML declaration and DOCTYPE from SVG source."""
     svg_source = XML_DECL_RE.sub("", svg_source, count=1)
     return DOCTYPE_RE.sub("", svg_source, count=1)
 
 
 @contextmanager
-def _isolated_argv() -> Iterator[None]:
+def _isolated_argv() -> Generator[None]:
+    """Context manager to isolate sys.argv for svg2tikz."""
     original = sys.argv
     sys.argv = ["drawio2tikz-svg2tikz"]
     try:
@@ -165,8 +187,10 @@ def _default_output_path(
     input_path: Path,
     output: Path | None,
     page_index: int,
+    *,
     all_pages: bool,
 ) -> Path:
+    """Determine output path for TikZ file."""
     stem = drawio_stem(input_path)
     filename = f"{stem}-{page_index:02d}.tex" if all_pages else f"{stem}.tex"
 
@@ -178,6 +202,7 @@ def _default_output_path(
 
 
 def _source_comment(input_path: Path, page_index: int) -> str:
+    """Generate LaTeX comment with conversion metadata."""
     return (
         f"% Generated from {input_path} page {page_index} via drawio SVG and svg2tikz.\n"
         "% The intermediate SVG was sanitized by drawio2tikz.\n"
