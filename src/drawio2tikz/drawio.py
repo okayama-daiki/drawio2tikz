@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import re
+import urllib.parse
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+import zlib
+from dataclasses import dataclass, replace
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING
 
@@ -12,6 +16,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 DRAWIO_PX_TO_TEX_PT = 0.75
+BOLD_FONT_WEIGHT_MIN = 600
 FONT_SIZE_RE = re.compile(r"font-size:\s*([0-9.]+)px", re.IGNORECASE)
 CSS_COLOR_RE = re.compile(r"color:\s*([^;]+)", re.IGNORECASE)
 RGB_COLOR_RE = re.compile(r"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[^)]+)?\)", re.IGNORECASE)
@@ -144,16 +149,69 @@ def parse_labels(path: Path) -> dict[str, Label]:
     root = ET.parse(path).getroot()  # noqa: S314
     labels: dict[str, Label] = {}
 
-    for cell in root.findall(".//mxCell"):
-        cell_id = cell.get("id")
-        value = cell.get("value")
-        if not cell_id or not value:
-            continue
-        label = parse_label(value)
-        if label.lines:
-            labels[cell_id] = label
+    _collect_labels(root, labels)
+    for diagram_root in _diagram_roots(root):
+        _collect_labels(diagram_root, labels)
 
     return labels
+
+
+def _collect_labels(root: ET.Element, labels: dict[str, Label]) -> None:
+    for cell in root.findall(".//mxCell"):
+        _add_label(labels, cell.get("id"), cell.get("value"))
+
+    for obj in root.findall(".//object"):
+        _add_label(labels, obj.get("id"), obj.get("label"))
+
+
+def _add_label(labels: dict[str, Label], cell_id: str | None, value: str | None) -> None:
+    if not cell_id or not value:
+        return
+
+    label = parse_label(value)
+    if label.lines:
+        labels[cell_id] = label
+
+
+def _diagram_roots(root: ET.Element) -> list[ET.Element]:
+    roots: list[ET.Element] = []
+    for diagram in root.findall("diagram"):
+        text = (diagram.text or "").strip()
+        if not text:
+            continue
+        diagram_root = _diagram_root_from_text(text)
+        if diagram_root is not None:
+            roots.append(diagram_root)
+    return roots
+
+
+def _diagram_root_from_text(text: str) -> ET.Element | None:
+    xml_text = _decompress_diagram_text(text) if not text.startswith("<") else text
+    if not xml_text:
+        return None
+    try:
+        return ET.fromstring(xml_text)  # noqa: S314
+    except ET.ParseError:
+        return None
+
+
+def _decompress_diagram_text(text: str) -> str | None:
+    encoded = "".join(text.split())
+    try:
+        compressed = base64.b64decode(encoded, validate=True)
+    except binascii.Error, ValueError:
+        return None
+
+    for window_bits in (-zlib.MAX_WBITS, zlib.MAX_WBITS):
+        try:
+            inflated = zlib.decompress(compressed, window_bits)
+        except zlib.error:
+            continue
+        try:
+            return urllib.parse.unquote(inflated.decode("utf-8"))
+        except UnicodeDecodeError:
+            return None
+    return None
 
 
 def count_pages(path: Path) -> int:
@@ -180,12 +238,15 @@ def parse_label(value: str) -> Label:
     lines: list[LabelLine] = []
     font_sizes: list[float] = []
 
-    for runs in parser.lines:
+    for raw_runs in parser.lines:
+        runs = _trim_edge_whitespace(raw_runs)
         line_font_sizes = [run.font_size for run in runs if run.font_size]
         font_sizes.extend(line_font_sizes)
         line_text = _text_from_runs(runs)
         if line_text:
             first_font = line_font_sizes[0] if line_font_sizes else None
+            if first_font:
+                line_text = with_tex_font_size(line_text, first_font)
             lines.append(LabelLine(text=line_text, font_size=first_font))
 
     if not lines:
@@ -196,17 +257,54 @@ def parse_label(value: str) -> Label:
 
 
 def _text_from_runs(runs: list[TextRun]) -> str:
+    common_style = _common_style(runs)
     parts: list[str] = []
     for run in runs:
         text = run.text
         for char, replacement in TEX_SPECIALS.items():
             text = text.replace(char, replacement)
-        if run.bold:
+        if run.bold and not common_style.bold:
             text = rf"\textbf{{{text}}}"
-        if run.color:
+        if run.color and run.color != common_style.color:
             text = rf"\textcolor[HTML]{{{run.color}}}{{{text}}}"
         parts.append(text)
-    return "".join(parts)
+
+    text = "".join(parts)
+    if common_style.bold:
+        text = rf"\textbf{{{text}}}"
+    if common_style.color:
+        text = rf"\textcolor[HTML]{{{common_style.color}}}{{{text}}}"
+    return text
+
+
+def _common_style(runs: list[TextRun]) -> TextStyle:
+    if not runs:
+        return TextStyle()
+
+    color = runs[0].color
+    return TextStyle(
+        bold=all(run.bold for run in runs),
+        color=color if color and all(run.color == color for run in runs) else None,
+    )
+
+
+def _trim_edge_whitespace(runs: list[TextRun]) -> list[TextRun]:
+    trimmed = [run for run in runs if run.text]
+    if not trimmed:
+        return []
+
+    first = trimmed[0]
+    last = trimmed[-1]
+    trimmed[0] = replace(first, text=first.text.lstrip())
+    trimmed[-1] = replace(last, text=last.text.rstrip())
+    return [run for run in trimmed if run.text]
+
+
+def with_tex_font_size(text: str, font_size_px: float) -> str:
+    """Wrap TeX text in a font-size command converted from draw.io pixels."""
+    size_pt = font_size_px * DRAWIO_PX_TO_TEX_PT
+    leading_pt = size_pt * 1.2
+    return rf"\fontsize{{{size_pt:.1f}pt}}{{{leading_pt:.1f}pt}}\selectfont {text}"
 
 
 def _style_from_attrs(attrs: list[tuple[str, str | None]]) -> TextStyle:
@@ -223,10 +321,20 @@ def _style_from_attrs(attrs: list[tuple[str, str | None]]) -> TextStyle:
                 style.color = f"{int(r):02X}{int(g):02X}{int(b):02X}"
             elif hex_match := HEX_COLOR_RE.search(color_str):
                 style.color = hex_match.group(1).upper()
-    if "color" in attrs_dict and (
-        hex_match := HEX_COLOR_RE.search(attrs_dict["color"] or "")
-    ):
+        if match := FONT_WEIGHT_RE.search(css):
+            style.bold = _is_bold_weight(match.group(1).strip())
+    if "color" in attrs_dict and (hex_match := HEX_COLOR_RE.search(attrs_dict["color"] or "")):
         style.color = hex_match.group(1).upper()
-    if "weight" in attrs_dict and attrs_dict["weight"] in {"bold", "700"}:
+    if "weight" in attrs_dict and _is_bold_weight(attrs_dict["weight"] or ""):
         style.bold = True
     return style
+
+
+def _is_bold_weight(value: str) -> bool:
+    value = value.lower()
+    if value in {"bold", "bolder"}:
+        return True
+    try:
+        return int(value) >= BOLD_FONT_WEIGHT_MIN
+    except ValueError:
+        return False

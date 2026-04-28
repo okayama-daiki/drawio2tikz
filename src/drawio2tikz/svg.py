@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .drawio import DRAWIO_PX_TO_TEX_PT, Label, LabelLine
+from .drawio import Label, LabelLine, with_tex_font_size
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -88,7 +88,7 @@ def _text_svg_for_label(label: Label, image_attrs: dict[str, str]) -> str:
         y = float(image_attrs["y"])
         width = float(image_attrs["width"])
         height = float(image_attrs["height"])
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         return ""
 
     if not label.lines:
@@ -115,6 +115,4 @@ def _line_text_with_fallback_size(line: LabelLine, font_size_px: float) -> str:
     """Generate TeX text for a label line with fallback font size."""
     if line.font_size:
         return line.text
-    size_pt = font_size_px * DRAWIO_PX_TO_TEX_PT
-    leading_pt = size_pt * 1.2
-    return rf"\fontsize{{{size_pt:.1f}pt}}{{{leading_pt:.1f}pt}}\selectfont {line.text}"
+    return with_tex_font_size(line.text, font_size_px)

@@ -1,6 +1,16 @@
 """Tests for draw.io label parsing."""
 
-from drawio2tikz.drawio import parse_label
+from __future__ import annotations
+
+import base64
+import urllib.parse
+import zlib
+from typing import TYPE_CHECKING
+
+from drawio2tikz.drawio import parse_label, parse_labels
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_parse_mixed_formatting() -> None:
@@ -27,3 +37,57 @@ def test_parse_math_label_raw() -> None:
 
     expected = r"\fontsize{21.0pt}{25.2pt}\selectfont \(\times 10\)"
     assert label.lines[0].text == expected
+
+
+def test_parse_css_font_weight() -> None:
+    """Test parsing CSS font-weight declarations."""
+    label = parse_label('<span style="font-weight: 700;">heavy</span>')
+
+    assert label.lines[0].text == r"\textbf{heavy}"
+
+
+def test_parse_object_wrapped_label(tmp_path: Path) -> None:
+    """Test parsing labels stored on draw.io object wrappers."""
+    drawio_path = tmp_path / "object.drawio"
+    drawio_path.write_text(
+        """<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <object id="obj-1" label="Wrapped label">
+          <mxCell vertex="1" parent="1" />
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+""",
+        encoding="utf-8",
+    )
+
+    labels = parse_labels(drawio_path)
+
+    assert labels["obj-1"].lines[0].text == "Wrapped label"
+
+
+def test_parse_compressed_diagram_label(tmp_path: Path) -> None:
+    """Test parsing labels from compressed draw.io diagram payloads."""
+    drawio_path = tmp_path / "compressed.drawio"
+    model = (
+        '<mxGraphModel><root><mxCell id="cell-1" value="Compressed label" /></root></mxGraphModel>'
+    )
+    drawio_path.write_text(
+        f"<mxfile><diagram>{_compress_diagram(model)}</diagram></mxfile>",
+        encoding="utf-8",
+    )
+
+    labels = parse_labels(drawio_path)
+
+    assert labels["cell-1"].lines[0].text == "Compressed label"
+
+
+def _compress_diagram(xml_text: str) -> str:
+    compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+    payload = urllib.parse.quote(xml_text, safe="").encode()
+    compressed = compressor.compress(payload) + compressor.flush()
+    return base64.b64encode(compressed).decode()

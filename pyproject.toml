@@ -45,6 +45,7 @@ ignore = [
   "D203", # Insert 1 blank line before class docstring
   "D213", # Multi-line docstring summary should start at the next line
   "S101", # Use of assert (standard in pytest)
+  "COM812", # Formatter handles trailing commas
   "PLR0913", # Too many arguments (CLI requirement for Typer)
 ]
 

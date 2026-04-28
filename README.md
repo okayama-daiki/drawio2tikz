@@ -52,7 +52,7 @@ Convert a single page from a draw.io file to TikZ:
 drawio2tikz path/to/figure.drawio -o output_dir
 ```
 
-This generates `figure.tikz` in the output directory.
+This generates `figure.tex` in the output directory.
 
 ### Convert All Pages
 
@@ -62,7 +62,7 @@ To convert all pages in a multi-page `.drawio` file:
 drawio2tikz path/to/multipage.drawio --all-pages -o output_dir
 ```
 
-Each page is saved as `figure_page{N}.tikz`.
+Each page is saved as `multipage-01.tex`, `multipage-02.tex`, and so on.
 
 ### Keep Intermediate SVG
 
@@ -90,7 +90,7 @@ Add these packages to your LaTeX document preamble:
 Include the generated TikZ file:
 
 ```tex
-\input{path/to/figure.tikz}
+\input{path/to/figure.tex}
 ```
 
 For support of arbitrary large font sizes, use a scalable font:
@@ -113,7 +113,7 @@ For support of arbitrary large font sizes, use a scalable font:
 
 \begin{figure}
   \centering
-  \input{figures/diagram.tikz}
+  \input{figures/diagram.tex}
   \caption{A diagram created in draw.io}
 \end{figure}
 
