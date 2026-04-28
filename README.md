@@ -17,12 +17,6 @@
 
 ## Installation
 
-### Homebrew (macOS)
-
-```bash
-brew install drawio2tikz
-```
-
 ### pip / uv
 
 Install from PyPI:
