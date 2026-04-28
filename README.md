@@ -1,81 +1,134 @@
 # drawio2tikz
 
-`drawio2tikz` is a thin wrapper around [`svg2tikz`](https://github.com/xyz2tex/svg2tikz) that converts draw.io diagrams to TikZ.
+`drawio2tikz` is a thin wrapper around [`svg2tikz`](https://github.com/xyz2tex/svg2tikz) that converts draw.io diagrams to TikZ code for embedding in LaTeX documents.
 
 ## Features
 
-- Converts either a single draw.io page or all pages.
-- Preserves label colors, bold text, font sizes, and simple line breaks.
-- **Ignores draw.io font family names**, so the output uses the host LaTeX document font.
-- Removes draw.io SVG CSS that `svg2tikz` cannot parse, including `light-dark(...)` from draw.io's dark mode color scheme.
-- Restores draw.io labels emitted as SVG `foreignObject` elements, which draw.io exports as HTML fragments.
+- Converts either a single draw.io page or all pages
+- Preserves label colors, bold text, font sizes, and simple line breaks
+- **Ignores draw.io font family names**, allowing output to use the host LaTeX document font
+- Removes draw.io SVG CSS that `svg2tikz` cannot parse, including `light-dark(...)` from draw.io's dark mode color scheme
+- Restores draw.io labels emitted as SVG `foreignObject` elements, which draw.io exports as HTML fragments
 
 ## Requirements
 
-- Python 3.10 or newer.
-- `drawio` CLI available on `PATH`.
+- **Python 3.14 or newer**
+- **`drawio` CLI** available on `PATH` (install from [diagrams.net](https://diagrams.net) or via Homebrew: `brew install --cask drawio`)
 
-## Install
+## Installation
 
-### Using Homebrew (macOS)
+### Homebrew (macOS)
 
-```sh
+```bash
 brew install drawio2tikz
 ```
 
-### Using uv
+### pip / uv
 
-```sh
+Install from PyPI:
+
+```bash
 uv tool install drawio2tikz
 ```
 
-### Development
+Or with pip:
 
-```sh
+```bash
+pip install drawio2tikz
+```
+
+### Development Setup
+
+Clone the repository and install in development mode:
+
+```bash
+git clone https://github.com/daikiokayama/drawio2tikz.git
+cd drawio2tikz
 uv sync
 uv run drawio2tikz --help
 ```
 
 ## Usage
 
-Convert one page:
+### Basic Usage
 
-```sh
-drawio2tikz path/to/figure.drawio -o out
+Convert a single page from a draw.io file to TikZ:
+
+```bash
+drawio2tikz path/to/figure.drawio -o output_dir
 ```
 
-Keep the sanitized intermediate SVG:
+This generates `figure.tikz` in the output directory.
 
-```sh
-drawio2tikz path/to/figure.drawio -o out --keep-svg --svg-dir out/svg
+### Convert All Pages
+
+To convert all pages in a multi-page `.drawio` file:
+
+```bash
+drawio2tikz path/to/multipage.drawio --all-pages -o output_dir
 ```
 
-Convert all pages in a `.drawio` file:
+Each page is saved as `figure_page{N}.tikz`.
 
-```sh
-drawio2tikz path/to/multipage.drawio --all-pages -o out
+### Keep Intermediate SVG
+
+To debug or inspect the intermediate SVG (after sanitization):
+
+```bash
+drawio2tikz path/to/figure.drawio -o output_dir --keep-svg --svg-dir output_dir/svg
 ```
 
----
+### View Help
 
-- LaTeX document using generated TikZ should load:
+```bash
+drawio2tikz --help
+```
+
+## LaTeX Setup
+
+Add these packages to your LaTeX document preamble:
 
 ```tex
 \usepackage{xcolor}
 \usepackage{tikz}
 ```
 
-For arbitrary large font sizes, use a scalable font such as:
+Include the generated TikZ file:
+
+```tex
+\input{path/to/figure.tikz}
+```
+
+For support of arbitrary large font sizes, use a scalable font:
 
 ```tex
 \usepackage{mlmodern}
 ```
 
-## How It Works
+### Example LaTeX Document
 
-`svg2tikz` cannot consume draw.io HTML text directly because draw.io exports it as SVG `foreignObject`. This tool reads the original `.drawio` XML, reconstructs text labels, injects them into the exported SVG as normal SVG text, sanitizes unsupported CSS, and then calls `svg2tikz.convert_svg()`.
+```tex
+\documentclass{article}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{mlmodern}
 
-Font family names from draw.io are intentionally ignored. The generated TikZ uses LaTeX commands for color, boldness, and size, while letting the host document choose the actual font.
+\begin{document}
+
+\section{My Diagram}
+
+\begin{figure}
+  \centering
+  \input{figures/diagram.tikz}
+  \caption{A diagram created in draw.io}
+\end{figure}
+
+\end{document}
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to open issues or submit pull requests on [GitHub](https://github.com/daikiokayama/drawio2tikz).
 
 ## License
 

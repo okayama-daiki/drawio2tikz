@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Convert diagrams.net/draw.io diagrams to TikZ via SVG."
 readme = "README.md"
 authors = [{ name = "Daiki Okayama", email = "lawliet.d.k.m@gmail.com" }]
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 license = "MIT"
 keywords = ["drawio", "diagrams.net", "svg", "tikz", "latex"]
 classifiers = [
@@ -17,10 +17,7 @@ classifiers = [
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Operating System :: OS Independent",
   "Topic :: Multimedia :: Graphics :: Editors :: Vector-Based",
   "Topic :: Text Processing :: Markup :: LaTeX",
