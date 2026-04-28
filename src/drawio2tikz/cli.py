@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from pathlib import (
+    Path,  # noqa: TC003 (Typer does search `Path` in global namespaces at runtime)
+)
+from typing import Annotated
 
 import typer
 from rich.console import Console
 
 from .converter import ConvertOptions, convert
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 app = typer.Typer(
     add_completion=False,
