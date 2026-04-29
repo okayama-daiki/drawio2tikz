@@ -22,6 +22,7 @@ CSS_COLOR_RE = re.compile(r"color:\s*([^;]+)", re.IGNORECASE)
 RGB_COLOR_RE = re.compile(r"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[^)]+)?\)", re.IGNORECASE)
 HEX_COLOR_RE = re.compile(r"#([0-9a-fA-F]{6})")
 FONT_WEIGHT_RE = re.compile(r"font-weight:\s*([^;]+)", re.IGNORECASE)
+DRAWIO_STYLE_FONT_SIZE_RE = re.compile(r"(?:^|;)fontSize=([0-9.]+)(?:;|$)")
 
 TEX_SPECIALS = {
     "&": r"\&",
@@ -158,19 +159,37 @@ def parse_labels(path: Path) -> dict[str, Label]:
 
 def _collect_labels(root: ET.Element, labels: dict[str, Label]) -> None:
     for cell in root.findall(".//mxCell"):
-        _add_label(labels, cell.get("id"), cell.get("value"))
+        _add_label(labels, cell.get("id"), cell.get("value"), cell.get("style"))
 
     for obj in root.findall(".//object"):
-        _add_label(labels, obj.get("id"), obj.get("label"))
+        _add_label(labels, obj.get("id"), obj.get("label"), _object_style(obj))
 
 
-def _add_label(labels: dict[str, Label], cell_id: str | None, value: str | None) -> None:
+def _add_label(
+    labels: dict[str, Label],
+    cell_id: str | None,
+    value: str | None,
+    style: str | None,
+) -> None:
     if not cell_id or not value:
         return
 
-    label = parse_label(value)
+    label = parse_label(value, default_font_size=_drawio_style_font_size(style))
     if label.lines:
         labels[cell_id] = label
+
+
+def _object_style(obj: ET.Element) -> str | None:
+    cell = obj.find("mxCell")
+    return cell.get("style") if cell is not None else None
+
+
+def _drawio_style_font_size(style: str | None) -> float | None:
+    if not style:
+        return None
+    if match := DRAWIO_STYLE_FONT_SIZE_RE.search(style):
+        return float(match.group(1))
+    return None
 
 
 def _diagram_roots(root: ET.Element) -> list[ET.Element]:
@@ -230,9 +249,11 @@ def drawio_stem(path: Path) -> str:
     return path.stem
 
 
-def parse_label(value: str) -> Label:
+def parse_label(value: str, default_font_size: float | None = None) -> Label:
     """Parse a single label from HTML string."""
     parser = DrawioLabelParser()
+    if default_font_size:
+        parser.current_style.font_size = default_font_size
     parser.feed(value)
 
     lines: list[LabelLine] = []

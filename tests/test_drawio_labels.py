@@ -70,6 +70,56 @@ def test_parse_object_wrapped_label(tmp_path: Path) -> None:
     assert labels["obj-1"].lines[0].text == "Wrapped label"
 
 
+def test_parse_mxcell_style_font_size(tmp_path: Path) -> None:
+    """Test parsing labels with draw.io fontSize style declarations."""
+    drawio_path = tmp_path / "style-font-size.drawio"
+    drawio_path.write_text(
+        """<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <mxCell id="cell-1" value="Sized label" style="text;html=1;fontSize=32;" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+""",
+        encoding="utf-8",
+    )
+
+    labels = parse_labels(drawio_path)
+
+    assert labels["cell-1"].lines[0].text == (
+        r"\fontsize{24.0pt}{28.8pt}\selectfont Sized label"
+    )
+
+
+def test_parse_object_wrapped_style_font_size(tmp_path: Path) -> None:
+    """Test parsing object labels with fontSize on the wrapped mxCell."""
+    drawio_path = tmp_path / "object-style-font-size.drawio"
+    drawio_path.write_text(
+        """<mxfile>
+  <diagram>
+    <mxGraphModel>
+      <root>
+        <object id="obj-1" label="Wrapped sized label">
+          <mxCell vertex="1" parent="1" style="text;html=1;fontSize=28;" />
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+""",
+        encoding="utf-8",
+    )
+
+    labels = parse_labels(drawio_path)
+
+    assert labels["obj-1"].lines[0].text == (
+        r"\fontsize{21.0pt}{25.2pt}\selectfont Wrapped sized label"
+    )
+
+
 def test_parse_compressed_diagram_label(tmp_path: Path) -> None:
     """Test parsing labels from compressed draw.io diagram payloads."""
     drawio_path = tmp_path / "compressed.drawio"
