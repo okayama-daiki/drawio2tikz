@@ -23,6 +23,7 @@ RGB_COLOR_RE = re.compile(r"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[^)]+)?\)", re.
 HEX_COLOR_RE = re.compile(r"#([0-9a-fA-F]{6})")
 FONT_WEIGHT_RE = re.compile(r"font-weight:\s*([^;]+)", re.IGNORECASE)
 DRAWIO_STYLE_FONT_SIZE_RE = re.compile(r"(?:^|;)fontSize=([0-9.]+)(?:;|$)")
+TEX_MATH_SPAN_RE = re.compile(r"(\\\(.*?\\\)|\\\[.*?\\\])")
 
 TEX_SPECIALS = {
     "&": r"\&",
@@ -281,9 +282,7 @@ def _text_from_runs(runs: list[TextRun]) -> str:
     common_style = _common_style(runs)
     parts: list[str] = []
     for run in runs:
-        text = run.text
-        for char, replacement in TEX_SPECIALS.items():
-            text = text.replace(char, replacement)
+        text = _escape_tex_text(run.text)
         if run.bold and not common_style.bold:
             text = rf"\textbf{{{text}}}"
         if run.color and run.color != common_style.color:
@@ -295,6 +294,24 @@ def _text_from_runs(runs: list[TextRun]) -> str:
         text = rf"\textbf{{{text}}}"
     if common_style.color:
         text = rf"\textcolor[HTML]{{{common_style.color}}}{{{text}}}"
+    return text
+
+
+def _escape_tex_text(text: str) -> str:
+    """Escape TeX text while preserving explicit math spans."""
+    parts: list[str] = []
+    offset = 0
+    for match in TEX_MATH_SPAN_RE.finditer(text):
+        parts.append(_escape_tex_plain_text(text[offset : match.start()]))
+        parts.append(match.group(0))
+        offset = match.end()
+    parts.append(_escape_tex_plain_text(text[offset:]))
+    return "".join(parts)
+
+
+def _escape_tex_plain_text(text: str) -> str:
+    for char, replacement in TEX_SPECIALS.items():
+        text = text.replace(char, replacement)
     return text
 
 
