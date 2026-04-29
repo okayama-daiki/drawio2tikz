@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib.metadata import version as package_version
 from pathlib import (
     Path,  # noqa: TC003 (Typer does search `Path` in global namespaces at runtime)
 )
@@ -17,6 +18,12 @@ app = typer.Typer(
     help="Convert diagrams.net/draw.io diagrams to TikZ via sanitized SVG.",
 )
 console = Console()
+
+
+def _version_callback(value: object) -> None:
+    if value is True:
+        console.print(f"drawio2tikz {package_version('drawio2tikz')}")
+        raise typer.Exit
 
 
 @app.command()
@@ -74,6 +81,15 @@ def main(
         bool,
         typer.Option("--quiet", "-q", help="Suppress external command echoing."),
     ] = False,
+    _version: Annotated[
+        bool | None,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show version and exit.",
+        ),
+    ] = None,
 ) -> None:
     """Convert draw.io diagrams to TikZ LaTeX code."""
     if svg_dir and not keep_svg:
