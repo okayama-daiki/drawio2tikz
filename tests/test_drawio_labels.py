@@ -39,6 +39,27 @@ def test_parse_math_label_raw() -> None:
     assert label.lines[0].text == expected
 
 
+def test_parse_math_label_preserves_tex_syntax() -> None:
+    """Test parsing draw.io math labels without escaping math syntax."""
+    label = parse_label(
+        '<span style="font-size: 50px;"><font style="color: rgb(255, 128, 0);">'
+        r"\(= D_{T_{\textrm{GTE}}(G)}(s, u_1)\)"
+        "</font></span>",
+    )
+
+    assert label.lines[0].text == (
+        r"\fontsize{37.5pt}{45.0pt}\selectfont "
+        r"\textcolor[HTML]{FF8000}{\(= D_{T_{\textrm{GTE}}(G)}(s, u_1)\)}"
+    )
+
+
+def test_parse_math_label_still_escapes_surrounding_text() -> None:
+    """Test escaping normal text while preserving inline math spans."""
+    label = parse_label(r"a_b \(x_i\) {z}")
+
+    assert label.lines[0].text == r"a\_b \(x_i\) \{z\}"
+
+
 def test_parse_css_font_weight() -> None:
     """Test parsing CSS font-weight declarations."""
     label = parse_label('<span style="font-weight: 700;">heavy</span>')
